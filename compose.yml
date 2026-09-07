@@ -5,3 +5,12 @@ services:
     restart: unless-stopped
     ports:
       - 8080:8080
+    volumes:
+      # Directory volume (not a single-file bind) so WAL -wal/-shm sidecars work.
+      - projector-data:/data
+    environment:
+      # Optional: raise GitHub's rate limit for live release fetches.
+      - PROJECTOR_GITHUB_TOKEN=${PROJECTOR_GITHUB_TOKEN:-}
+
+volumes:
+  projector-data:

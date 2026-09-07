@@ -14,23 +14,33 @@ FROM --platform=$BUILDPLATFORM golang:alpine AS build-go
 
 ARG TARGETOS
 ARG TARGETARCH
+ARG VERSION=dev
+
+# ca-certificates provides /etc/ssl/certs/ca-certificates.crt copied into scratch.
+RUN apk add --no-cache ca-certificates
 
 WORKDIR /app
 
-COPY go.mod ./
+COPY go.mod go.sum ./
 
 RUN go mod download
 
 COPY . .
 
-RUN CGO_ENABLED=0 GOOS=${TARGETOS} GOARCH=${TARGETARCH} go build -o /server
+# The built SPA must be present before `go build` so //go:embed frontend/dist works.
+COPY --from=build-vue /app/frontend/dist ./frontend/dist
+
+RUN CGO_ENABLED=0 GOOS=${TARGETOS} GOARCH=${TARGETARCH} \
+    go build -ldflags "-s -w -X main.version=${VERSION}" -o /server
 
 FROM scratch
 
 WORKDIR /
 
 COPY --from=build-go /server /server
-COPY --from=build-vue /app/frontend/dist /frontend/dist
+
+# scratch has no CA bundle; outbound HTTPS to provider APIs fails without this.
+COPY --from=build-go /etc/ssl/certs/ca-certificates.crt /etc/ssl/certs/ca-certificates.crt
 
 EXPOSE 8080
 
