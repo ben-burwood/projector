@@ -1,0 +1,24 @@
+<svg xmlns="http://www.w3.org/2000/svg" width="64" height="64" viewBox="0 0 64 64" role="img" aria-label="Projector">
+  <!-- tile -->
+  <rect x="2" y="2" width="60" height="60" rx="14" fill="#2b2620"/>
+
+  <!-- projected light beam -->
+  <polygon points="17,33 17,39 2,24 2,50" fill="#facc15" opacity="0.35"/>
+
+  <!-- projector body -->
+  <rect x="18" y="26" width="30" height="20" rx="6" fill="#ece3ca"/>
+  <!-- lamp housing on top -->
+  <rect x="29" y="19" width="13" height="8" rx="3" fill="#ece3ca"/>
+  <!-- feet -->
+  <rect x="23" y="45" width="6" height="4" rx="1.5" fill="#7d7259"/>
+  <rect x="39" y="45" width="6" height="4" rx="1.5" fill="#7d7259"/>
+
+  <!-- lens -->
+  <circle cx="18" cy="36" r="7.5" fill="#ece3ca"/>
+  <circle cx="18" cy="36" r="4.5" fill="#facc15"/>
+  <circle cx="18" cy="36" r="1.8" fill="#2b2620"/>
+
+  <!-- star in the corner -->
+  <path d="M50,6.5 L51.6,10.6 L56,10.9 L52.6,13.7 L53.7,18 L50,15.6 L46.3,18 L47.4,13.7 L44,10.9 L48.4,10.6 Z"
+        fill="#fde047" stroke="#f59e0b" stroke-width="0.6" stroke-linejoin="round"/>
+</svg>
