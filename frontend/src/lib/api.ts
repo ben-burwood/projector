@@ -86,7 +86,9 @@ export const api = {
 
   // Detection + feed (Phase 2/3)
   detect: (url: string) => request<DetectResponse>("POST", "/detect", { url }),
-  feed: (f: { tag?: string; source?: string; page?: number; limit?: number } = {}) =>
+  feed: (
+    f: { tag?: string; source?: string; all?: boolean; page?: number; limit?: number } = {},
+  ) =>
     request<FeedResponse>("GET", `/feed${query(f)}`),
   refreshFeed: () => request<void>("POST", "/feed/refresh"),
 

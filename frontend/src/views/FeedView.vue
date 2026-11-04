@@ -17,6 +17,10 @@
         <option value="">All tags</option>
         <option v-for="t in tagsStore.tags" :key="t.id" :value="t.name">{{ t.name }}</option>
       </select>
+      <label class="label cursor-pointer gap-1">
+        <span class="label-text text-xs">Include not in use</span>
+        <input type="checkbox" class="checkbox checkbox-sm" v-model="includeNotInUse" @change="reload" />
+      </label>
     </div>
 
     <!-- Per-project fetch errors, inline, non-fatal -->
@@ -68,12 +72,18 @@ const hasMore = ref(false);
 const page = ref(1);
 const source = ref("");
 const tag = ref("");
+const includeNotInUse = ref(false);
 
 async function fetchPage(p: number, append: boolean) {
   loading.value = true;
   fatalError.value = "";
   try {
-    const res = await api.feed({ page: p, source: source.value, tag: tag.value });
+    const res = await api.feed({
+      page: p,
+      source: source.value,
+      tag: tag.value,
+      all: includeNotInUse.value || undefined,
+    });
     items.value = append ? [...items.value, ...res.items] : res.items;
     errors.value = res.errors ?? [];
     hasMore.value = res.has_more;

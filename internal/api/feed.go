@@ -53,13 +53,17 @@ func (a *API) handleFeed(w http.ResponseWriter, r *http.Request) {
 		limit = 30
 	}
 
-	// Only in-use, pollable projects appear in the feed.
-	inUse := true
-	projects, err := a.store.ListProjects(store.ProjectFilter{
+	// Only in-use, pollable projects appear in the feed, unless ?all=1 asks to
+	// include not-in-use ones too.
+	f := store.ProjectFilter{
 		Tag:    q.Get("tag"),
 		Source: q.Get("source"),
-		InUse:  &inUse,
-	})
+	}
+	if all := parseBoolParam(q.Get("all")); all == nil || !*all {
+		inUse := true
+		f.InUse = &inUse
+	}
+	projects, err := a.store.ListProjects(f)
 	if err != nil {
 		writeStoreErr(w, err)
 		return
