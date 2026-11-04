@@ -4,6 +4,7 @@
 import type {
   DetectResponse,
   FeedResponse,
+  ImportResult,
   Project,
   ProjectFilter,
   Release,
@@ -88,4 +89,8 @@ export const api = {
   feed: (f: { tag?: string; source?: string; page?: number; limit?: number } = {}) =>
     request<FeedResponse>("GET", `/feed${query(f)}`),
   refreshFeed: () => request<void>("POST", "/feed/refresh"),
+
+  // Import
+  importGitHubStars: (body: { username: string; in_use?: boolean; tag_ids?: number[] }) =>
+    request<ImportResult>("POST", "/import/github-stars", body),
 };

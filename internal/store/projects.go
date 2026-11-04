@@ -265,3 +265,61 @@ func boolToInt(b bool) int {
 	}
 	return 0
 }
+
+// ImportProjects inserts each project not already tracked (matched on
+// source_type + source_identifier, case-insensitively) and attaches tagIDs to
+// the new rows, all in one transaction. It returns how many were inserted.
+func (s *Store) ImportProjects(ps []Project, tagIDs []int64) (int, error) {
+	tx, err := s.db.Begin()
+	if err != nil {
+		return 0, err
+	}
+	defer tx.Rollback()
+
+	exists, err := tx.Prepare(`SELECT 1 FROM projects
+		WHERE source_type = ? AND source_identifier = ? COLLATE NOCASE`)
+	if err != nil {
+		return 0, err
+	}
+	defer exists.Close()
+	insert, err := tx.Prepare(`
+		INSERT INTO projects
+			(name, url, source_type, source_identifier, source_host,
+			 source_meta, in_use, created_at, updated_at)
+		VALUES (?, ?, ?, ?, ?, '{}', ?, ?, ?)`)
+	if err != nil {
+		return 0, err
+	}
+	defer insert.Close()
+	tag, err := tx.Prepare(`INSERT OR IGNORE INTO project_tags (project_id, tag_id) VALUES (?, ?)`)
+	if err != nil {
+		return 0, err
+	}
+	defer tag.Close()
+
+	now := nowUTC()
+	n := 0
+	for _, p := range ps {
+		var one int
+		err := exists.QueryRow(p.SourceType, p.SourceIdentifier).Scan(&one)
+		if err == nil {
+			continue
+		}
+		if !errors.Is(err, sql.ErrNoRows) {
+			return 0, err
+		}
+		res, err := insert.Exec(p.Name, p.URL, p.SourceType, p.SourceIdentifier,
+			p.SourceHost, boolToInt(p.InUse), now, now)
+		if err != nil {
+			return 0, err
+		}
+		id, _ := res.LastInsertId()
+		for _, tid := range tagIDs {
+			if _, err := tag.Exec(id, tid); err != nil {
+				return 0, err
+			}
+		}
+		n++
+	}
+	return n, tx.Commit()
+}

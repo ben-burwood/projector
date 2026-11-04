@@ -73,6 +73,12 @@ export interface DetectResponse {
   };
 }
 
+export interface ImportResult {
+  total: number;
+  imported: number;
+  skipped: number;
+}
+
 export interface ProjectFilter {
   tag?: string;
   source?: string;

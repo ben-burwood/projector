@@ -24,6 +24,8 @@ Projector is a **live viewer, not a monitor**: it never stores release data and 
 
 Paste a URL on the **Add** page and Projector auto-detects the source and prefills the name.
 
+You can also **import your GitHub stars** from the Add page: enter a username (or leave it blank to use the owner of `PROJECTOR_GITHUB_TOKEN`). Every starred repo is bookmarked, optionally with tags. Repos you already track are skipped, so it's safe to run again.
+
 ## Tech
 
 - **Backend:** Go (stdlib `net/http`), pure-Go SQLite (`modernc.org/sqlite`), single static binary.

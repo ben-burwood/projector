@@ -55,16 +55,55 @@
         </div>
       </div>
     </div>
+
+    <div class="divider">or</div>
+
+    <!-- Bulk import: every repo a GitHub user has starred -->
+    <div class="card bg-base-100 shadow-md">
+      <div class="card-body gap-3">
+        <h2 class="card-title text-lg">Import GitHub stars</h2>
+
+        <input
+          v-model="starUser"
+          class="input input-bordered input-sm w-full"
+          placeholder="GitHub username (blank = token owner)"
+          @keydown.enter.prevent="importStars"
+        />
+
+        <div class="form-control">
+          <span class="label-text mb-1">Tag imported projects</span>
+          <TagPicker v-model="starTagIds" />
+        </div>
+
+        <label class="label cursor-pointer justify-start gap-2">
+          <input type="checkbox" class="toggle toggle-sm toggle-primary" v-model="starInUse" />
+          <span class="label-text">Mark as in use</span>
+        </label>
+
+        <div v-if="importError" class="alert alert-error text-sm">{{ importError }}</div>
+        <div v-if="importResult" class="alert alert-success text-sm">
+          Imported {{ importResult.imported }} of {{ importResult.total }} starred repos
+          <span v-if="importResult.skipped">({{ importResult.skipped }} already tracked)</span>.
+          <RouterLink to="/projects" class="link">View projects</RouterLink>
+        </div>
+
+        <div class="card-actions justify-end">
+          <button class="btn btn-primary btn-sm" :disabled="importing" @click="importStars">
+            {{ importing ? "Importing…" : "Import stars" }}
+          </button>
+        </div>
+      </div>
+    </div>
   </div>
 </template>
 
 <script setup lang="ts">
 import { ref } from "vue";
-import { useRouter } from "vue-router";
+import { RouterLink, useRouter } from "vue-router";
 import SourceBadge from "@/components/SourceBadge.vue";
 import TagPicker from "@/components/TagPicker.vue";
 import { api } from "@/lib/api";
-import type { DetectResponse, SourceType } from "@/lib/types";
+import type { DetectResponse, ImportResult, SourceType } from "@/lib/types";
 
 const router = useRouter();
 
@@ -144,5 +183,29 @@ function reset() {
   url.value = "";
   tagIds.value = [];
   detectError.value = "";
+}
+
+const starUser = ref("");
+const starTagIds = ref<number[]>([]);
+const starInUse = ref(false);
+const importing = ref(false);
+const importError = ref("");
+const importResult = ref<ImportResult | null>(null);
+
+async function importStars() {
+  importing.value = true;
+  importError.value = "";
+  importResult.value = null;
+  try {
+    importResult.value = await api.importGitHubStars({
+      username: starUser.value.trim(),
+      in_use: starInUse.value,
+      tag_ids: starTagIds.value,
+    });
+  } catch (e: any) {
+    importError.value = e.message ?? String(e);
+  } finally {
+    importing.value = false;
+  }
 }
 </script>

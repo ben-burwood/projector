@@ -55,6 +55,9 @@ func (a *API) Handler() http.Handler {
 	mux.HandleFunc("GET /api/feed", a.handleFeed)
 	mux.HandleFunc("POST /api/feed/refresh", a.handleRefreshFeed)
 
+	// Import
+	mux.HandleFunc("POST /api/import/github-stars", a.handleImportGitHubStars)
+
 	return chain(mux, recoverMW, logMW)
 }
 

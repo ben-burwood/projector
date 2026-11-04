@@ -171,3 +171,48 @@ func (g *githubProvider) fetchTags(ctx context.Context, req FetchRequest) (Fetch
 	}
 	return FetchResult{ETag: res.ETag, LastModified: res.LastModified, Releases: out}, nil
 }
+
+// StarredRepo is one repository from a user's GitHub stars.
+type StarredRepo struct {
+	FullName    string `json:"full_name"`
+	Name        string `json:"name"`
+	Description string `json:"description"`
+	HTMLURL     string `json:"html_url"`
+}
+
+// StarLister lists a user's starred repositories. Implemented by the GitHub
+// provider; callers reach it via a type assertion on Registry.Get(GitHub).
+type StarLister interface {
+	Starred(ctx context.Context, user string) ([]StarredRepo, error)
+}
+
+// maxStarPages bounds the star import (100 per page → 5,000 repos).
+const maxStarPages = 50
+
+// Starred returns every repository starred by user. An empty user lists the
+// stars of the token's owner (requires PROJECTOR_GITHUB_TOKEN).
+func (g *githubProvider) Starred(ctx context.Context, user string) ([]StarredRepo, error) {
+	base := githubAPI + "/users/" + url.PathEscape(user) + "/starred"
+	if user == "" {
+		if g.token == "" {
+			return nil, fmt.Errorf("a username is required when no GitHub token is configured")
+		}
+		base = githubAPI + "/user/starred"
+	}
+	var out []StarredRepo
+	for page := 1; page <= maxStarPages; page++ {
+		res, err := g.hc.getCond(ctx, fmt.Sprintf("%s?per_page=100&page=%d", base, page), "", "", g.header())
+		if err != nil {
+			return nil, err
+		}
+		var batch []StarredRepo
+		if err := decodeJSON(res, &batch); err != nil {
+			return nil, err
+		}
+		out = append(out, batch...)
+		if len(batch) < 100 {
+			break
+		}
+	}
+	return out, nil
+}
