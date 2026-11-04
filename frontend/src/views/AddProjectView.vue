@@ -1,98 +1,136 @@
 <template>
-  <div class="mx-auto flex max-w-xl flex-col gap-4">
-    <h1 class="text-2xl font-bold">Add project</h1>
+  <div class="mx-auto max-w-xl">
+    <PageHeader title="Add project" subtitle="Paste a link — Projector works out the source and fills in the details." />
 
-    <!-- Step 1: paste a URL, detect the source -->
-    <div class="join w-full">
-      <input
-        v-model="url"
-        class="input input-bordered join-item w-full"
-        placeholder="https://github.com/owner/repo, a package, or any website…"
-        @keydown.enter.prevent="detect"
-      />
-      <button class="btn btn-primary join-item" :disabled="detecting || !url.trim()" @click="detect">
-        {{ detecting ? "…" : "Detect" }}
-      </button>
-    </div>
-
-    <div v-if="detectError" class="alert alert-warning text-sm">
-      {{ detectError }} — you can still save it as a plain website bookmark below.
-    </div>
-
-    <!-- Step 2: confirm/edit prefilled details -->
-    <div v-if="form" class="card bg-base-100 shadow-md">
-      <div class="card-body gap-3">
-        <div class="flex items-center gap-2">
-          <span class="text-sm font-semibold">Detected as</span>
-          <SourceBadge :type="form.source_type" />
-          <span v-if="form.source_identifier" class="text-base-content/60 font-mono text-xs">
-            {{ form.source_identifier }}
-          </span>
-        </div>
-
-        <label class="form-control">
-          <span class="label-text">Name</span>
-          <input v-model="form.name" class="input input-bordered input-sm" />
-        </label>
-
-        <div class="form-control">
-          <span class="label-text mb-1">Tags</span>
-          <TagPicker v-model="tagIds" />
-        </div>
-
-        <label class="label cursor-pointer justify-start gap-2">
-          <input type="checkbox" class="toggle toggle-sm toggle-primary" v-model="inUse" />
-          <span class="label-text">In use</span>
-        </label>
-
-        <div v-if="saveError" class="alert alert-error text-sm">{{ saveError }}</div>
-
-        <div class="card-actions justify-end">
-          <button class="btn btn-ghost btn-sm" @click="reset">Cancel</button>
-          <button class="btn btn-primary btn-sm" :disabled="saving" @click="save">
-            {{ saving ? "Saving…" : "Save project" }}
+    <div class="flex flex-col gap-4">
+      <!-- Step 1: paste a URL, detect the source -->
+      <form class="panel flex flex-col gap-4 p-5" @submit.prevent="detect">
+        <div class="flex gap-2">
+          <div class="relative flex-1">
+            <Icon name="link" class="pointer-events-none absolute top-1/2 left-3 -translate-y-1/2 text-muted" />
+            <input
+              v-model="url"
+              class="field h-10 pl-9"
+              placeholder="github.com/owner/repo, a package, or any website…"
+              autofocus
+            />
+          </div>
+          <button type="submit" class="btn btn-primary h-10" :disabled="detecting || !url.trim()">
+            <span v-if="detecting" class="spinner" />
+            Detect
           </button>
         </div>
+
+        <div class="flex flex-wrap items-center gap-x-3 gap-y-1.5 text-xs text-muted">
+          <span>Supports</span>
+          <SourceBadge v-for="t in SOURCE_TYPES" :key="t" :type="t" />
+        </div>
+
+        <div v-if="detectError" class="notice notice-warn">
+          <Icon name="alert" class="mt-0.5" />
+          <span>{{ detectError }} — you can still save it as a plain website bookmark.</span>
+        </div>
+
+        <!-- Step 2: confirm/edit prefilled details -->
+        <div v-if="form" class="flex flex-col gap-4 border-t border-line pt-4">
+          <div class="flex items-center gap-3">
+            <ProjectAvatar
+              :name="form.name"
+              :type="form.source_type"
+              :identifier="form.source_identifier"
+            />
+            <div class="flex min-w-0 flex-col gap-0.5">
+              <SourceBadge :type="form.source_type" />
+              <span v-if="form.source_identifier" class="truncate font-mono text-xs text-muted">
+                {{ form.source_identifier }}
+              </span>
+            </div>
+          </div>
+
+          <p v-if="description" class="text-sm text-muted">{{ description }}</p>
+
+          <label class="flex flex-col gap-1.5">
+            <span class="eyebrow">Name</span>
+            <input v-model="form.name" class="field" />
+          </label>
+
+          <div class="flex flex-col gap-1.5">
+            <span class="eyebrow">Tags</span>
+            <TagPicker v-model="tagIds" />
+          </div>
+
+          <Toggle v-model="inUse" label="In use — show its releases in the feed" />
+
+          <div v-if="saveError" class="notice notice-error">
+            <Icon name="alert" class="mt-0.5" /> {{ saveError }}
+          </div>
+
+          <div class="flex justify-end gap-2">
+            <button type="button" class="btn btn-ghost btn-sm" @click="reset">Cancel</button>
+            <button type="button" class="btn btn-primary btn-sm" :disabled="saving" @click="save">
+              <span v-if="saving" class="spinner" />
+              Save project
+            </button>
+          </div>
+        </div>
+      </form>
+
+      <div class="flex items-center gap-3 text-xs text-muted">
+        <span class="h-px flex-1 bg-line" /> or <span class="h-px flex-1 bg-line" />
       </div>
-    </div>
 
-    <div class="divider">or</div>
+      <!-- Bulk import: every repo a GitHub user has starred -->
+      <form class="panel flex flex-col gap-4 p-5" @submit.prevent="importStars">
+        <div class="flex items-start gap-3">
+          <div class="flex size-10 shrink-0 items-center justify-center rounded-lg bg-accent/15 text-accent-text">
+            <Icon name="star" class="size-5" />
+          </div>
+          <div class="flex flex-col gap-0.5">
+            <h2 class="font-semibold">Import GitHub stars</h2>
+            <p class="text-sm text-muted">
+              Bookmark every repo a user has starred. Ones you already track are skipped.
+            </p>
+          </div>
+        </div>
 
-    <!-- Bulk import: every repo a GitHub user has starred -->
-    <div class="card bg-base-100 shadow-md">
-      <div class="card-body gap-3">
-        <h2 class="card-title text-lg">Import GitHub stars</h2>
+        <div class="relative">
+          <span class="pointer-events-none absolute top-1/2 left-3 -translate-y-1/2 text-sm text-muted">@</span>
+          <input
+            v-model="starUser"
+            class="field pl-8"
+            placeholder="username (blank = owner of the configured token)"
+          />
+        </div>
 
-        <input
-          v-model="starUser"
-          class="input input-bordered input-sm w-full"
-          placeholder="GitHub username (blank = token owner)"
-          @keydown.enter.prevent="importStars"
-        />
-
-        <div class="form-control">
-          <span class="label-text mb-1">Tag imported projects</span>
+        <div class="flex flex-col gap-1.5">
+          <span class="eyebrow">Tag imported projects</span>
           <TagPicker v-model="starTagIds" />
         </div>
 
-        <label class="label cursor-pointer justify-start gap-2">
-          <input type="checkbox" class="toggle toggle-sm toggle-primary" v-model="starInUse" />
-          <span class="label-text">Mark as in use</span>
-        </label>
+        <Toggle v-model="starInUse" label="Mark as in use" />
 
-        <div v-if="importError" class="alert alert-error text-sm">{{ importError }}</div>
-        <div v-if="importResult" class="alert alert-success text-sm">
-          Imported {{ importResult.imported }} of {{ importResult.total }} starred repos
-          <span v-if="importResult.skipped">({{ importResult.skipped }} already tracked)</span>.
-          <RouterLink to="/projects" class="link">View projects</RouterLink>
+        <div v-if="importError" class="notice notice-error">
+          <Icon name="alert" class="mt-0.5" /> {{ importError }}
+        </div>
+        <div v-if="importResult" class="notice notice-ok">
+          <Icon name="check" class="mt-0.5" />
+          <span>
+            Imported <strong>{{ importResult.imported }}</strong> of {{ importResult.total }} starred repos<template
+              v-if="importResult.skipped"
+            >
+              ({{ importResult.skipped }} already tracked)</template>.
+            <RouterLink to="/projects" class="font-medium underline underline-offset-2">View projects</RouterLink>
+          </span>
         </div>
 
-        <div class="card-actions justify-end">
-          <button class="btn btn-primary btn-sm" :disabled="importing" @click="importStars">
+        <div class="flex justify-end">
+          <button type="submit" class="btn btn-primary btn-sm" :disabled="importing">
+            <span v-if="importing" class="spinner" />
+            <Icon v-else name="download" />
             {{ importing ? "Importing…" : "Import stars" }}
           </button>
         </div>
-      </div>
+      </form>
     </div>
   </div>
 </template>
@@ -100,9 +138,14 @@
 <script setup lang="ts">
 import { ref } from "vue";
 import { RouterLink, useRouter } from "vue-router";
+import Icon from "@/components/Icon.vue";
+import PageHeader from "@/components/PageHeader.vue";
+import ProjectAvatar from "@/components/ProjectAvatar.vue";
 import SourceBadge from "@/components/SourceBadge.vue";
 import TagPicker from "@/components/TagPicker.vue";
+import Toggle from "@/components/Toggle.vue";
 import { api } from "@/lib/api";
+import { SOURCE_TYPES } from "@/lib/sources";
 import type { DetectResponse, ImportResult, SourceType } from "@/lib/types";
 
 const router = useRouter();
@@ -110,6 +153,7 @@ const router = useRouter();
 const url = ref("");
 const detecting = ref(false);
 const detectError = ref("");
+const description = ref("");
 
 interface Form {
   name: string;
@@ -125,6 +169,7 @@ const saving = ref(false);
 const saveError = ref("");
 
 function applyDetect(d: DetectResponse) {
+  description.value = d.prefill.description;
   form.value = {
     name: d.prefill.name || url.value,
     source_type: d.source_type,
@@ -138,6 +183,7 @@ async function detect() {
   if (!u) return;
   detecting.value = true;
   detectError.value = "";
+  description.value = "";
   form.value = null;
   try {
     const d = await api.detect(u);
@@ -183,6 +229,7 @@ function reset() {
   url.value = "";
   tagIds.value = [];
   detectError.value = "";
+  description.value = "";
 }
 
 const starUser = ref("");

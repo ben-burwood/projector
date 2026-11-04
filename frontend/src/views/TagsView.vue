@@ -1,60 +1,91 @@
 <template>
-  <div class="mx-auto flex max-w-lg flex-col gap-4">
-    <h1 class="text-2xl font-bold">Tags</h1>
+  <div class="mx-auto max-w-xl">
+    <PageHeader title="Tags" subtitle="Group projects however you like. Click a tag to see its projects." />
 
-    <div class="join w-full">
-      <input
-        v-model="newName"
-        class="input input-bordered join-item w-full"
-        placeholder="New tag name…"
-        @keydown.enter.prevent="add"
-      />
-      <button class="btn btn-primary join-item" :disabled="!newName.trim()" @click="add">Add</button>
+    <form class="mb-5 flex gap-2" @submit.prevent="add">
+      <div class="relative flex-1">
+        <Icon name="tag" class="pointer-events-none absolute top-1/2 left-3 -translate-y-1/2 text-muted" />
+        <input v-model="newName" class="field pl-9" placeholder="New tag name…" />
+      </div>
+      <button type="submit" class="btn btn-primary" :disabled="!newName.trim()">
+        <Icon name="plus" /> Add
+      </button>
+    </form>
+
+    <div v-if="store.loading && store.tags.length === 0" class="flex flex-col gap-2">
+      <div v-for="n in 4" :key="n" class="skeleton h-12" />
     </div>
 
-    <div v-if="store.loading" class="flex justify-center py-8">
-      <span class="loading loading-spinner" />
-    </div>
+    <EmptyState
+      v-else-if="store.tags.length === 0"
+      title="No tags yet"
+      hint="Create one above, or add tags while saving a project."
+      icon="tag"
+    />
 
-    <EmptyState v-else-if="store.tags.length === 0" title="No tags yet" icon="🏷️" />
+    <ul v-else class="panel divide-y divide-line overflow-hidden">
+      <li v-for="tag in store.tags" :key="tag.id" class="group flex items-center gap-3 px-4 py-2.5">
+        <form v-if="editing === tag.id" class="flex flex-1 items-center gap-2" @submit.prevent="commitRename(tag.id)">
+          <input
+            v-model="editName"
+            class="field h-8"
+            autofocus
+            @keydown.esc="editing = null"
+          />
+          <button type="submit" class="btn btn-primary btn-sm btn-icon" aria-label="Save">
+            <Icon name="check" />
+          </button>
+          <button type="button" class="btn btn-ghost btn-sm btn-icon" aria-label="Cancel" @click="editing = null">
+            <Icon name="x" />
+          </button>
+        </form>
 
-    <ul v-else class="menu bg-base-100 rounded-box w-full shadow">
-      <li v-for="tag in store.tags" :key="tag.id">
-        <div class="flex items-center justify-between">
-          <template v-if="editing === tag.id">
-            <input
-              v-model="editName"
-              class="input input-bordered input-sm flex-1"
-              @keydown.enter.prevent="commitRename(tag.id)"
-              @keydown.esc="editing = null"
-            />
-            <div class="flex gap-1">
-              <button class="btn btn-xs btn-primary" @click="commitRename(tag.id)">Save</button>
-              <button class="btn btn-xs" @click="editing = null">Cancel</button>
-            </div>
-          </template>
-          <template v-else>
-            <span>{{ tag.name }}<span class="text-base-content/50 ml-2 text-xs">({{ tag.project_count ?? 0 }})</span></span>
-            <div class="flex gap-1">
-              <button class="btn btn-ghost btn-xs" @click="startEdit(tag.id, tag.name)">Rename</button>
-              <button class="btn btn-ghost btn-xs text-error" @click="remove(tag.id)">Delete</button>
-            </div>
-          </template>
-        </div>
+        <template v-else>
+          <RouterLink
+            :to="{ path: '/projects', query: { tag: tag.name } }"
+            class="flex min-w-0 flex-1 items-center gap-3"
+          >
+            <span class="truncate font-medium group-hover:text-accent-text">
+              <span class="text-muted">#</span>{{ tag.name }}
+            </span>
+            <span class="h-1.5 max-w-32 flex-1 overflow-hidden rounded-full bg-surface-2 max-sm:hidden">
+              <span
+                class="block h-full rounded-full bg-accent/60"
+                :style="{ width: `${((tag.project_count ?? 0) / maxCount) * 100}%` }"
+              />
+            </span>
+            <span class="text-xs text-muted tabular-nums">
+              {{ tag.project_count ?? 0 }} project{{ tag.project_count === 1 ? "" : "s" }}
+            </span>
+          </RouterLink>
+          <div class="flex gap-0.5 sm:opacity-0 sm:transition-opacity sm:group-hover:opacity-100 sm:focus-within:opacity-100">
+            <button class="btn btn-ghost btn-sm btn-icon" aria-label="Rename" title="Rename" @click="startEdit(tag.id, tag.name)">
+              <Icon name="pencil" />
+            </button>
+            <button class="btn btn-danger btn-sm btn-icon" aria-label="Delete" title="Delete" @click="remove(tag.id, tag.name)">
+              <Icon name="trash" />
+            </button>
+          </div>
+        </template>
       </li>
     </ul>
   </div>
 </template>
 
 <script setup lang="ts">
-import { onMounted, ref } from "vue";
+import { computed, onMounted, ref } from "vue";
+import { RouterLink } from "vue-router";
 import EmptyState from "@/components/EmptyState.vue";
+import Icon from "@/components/Icon.vue";
+import PageHeader from "@/components/PageHeader.vue";
 import { useTagsStore } from "@/stores/tags";
 
 const store = useTagsStore();
 const newName = ref("");
 const editing = ref<number | null>(null);
 const editName = ref("");
+
+const maxCount = computed(() => Math.max(1, ...store.tags.map((t) => t.project_count ?? 0)));
 
 onMounted(() => store.load(true));
 
@@ -76,8 +107,8 @@ async function commitRename(id: number) {
   editing.value = null;
 }
 
-async function remove(id: number) {
-  if (confirm("Delete this tag? It will be removed from all projects.")) {
+async function remove(id: number, name: string) {
+  if (confirm(`Delete #${name}? It will be removed from all projects.`)) {
     await store.remove(id);
   }
 }

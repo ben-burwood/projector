@@ -17,6 +17,7 @@ type feedItem struct {
 	ProjectID   int64            `json:"project_id"`
 	ProjectName string           `json:"project_name"`
 	SourceType  string           `json:"source_type"`
+	SourceIdent string           `json:"source_identifier"`
 	Release     provider.Release `json:"release"`
 }
 
@@ -139,6 +140,7 @@ func (a *API) aggregate(ctx context.Context, projects []store.Project) ([]feedIt
 					ProjectID:   p.ID,
 					ProjectName: p.Name,
 					SourceType:  p.SourceType,
+					SourceIdent: p.SourceIdentifier,
 					Release:     rel,
 				})
 			}

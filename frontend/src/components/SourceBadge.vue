@@ -1,5 +1,8 @@
 <template>
-  <span class="badge badge-sm" :class="info.badge">{{ info.label }}</span>
+  <span class="inline-flex items-center gap-1.5 text-xs text-muted">
+    <span class="size-2 rounded-full" :style="{ backgroundColor: info.color }" />
+    {{ info.label }}
+  </span>
 </template>
 
 <script setup lang="ts">

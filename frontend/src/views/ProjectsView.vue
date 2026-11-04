@@ -1,48 +1,84 @@
 <template>
-  <div class="flex flex-col gap-4">
-    <div class="flex flex-wrap items-center justify-between gap-2">
-      <h1 class="text-2xl font-bold">Projects</h1>
-      <RouterLink to="/add" class="btn btn-primary btn-sm">+ Add project</RouterLink>
-    </div>
+  <div>
+    <PageHeader title="Projects">
+      <template #subtitle>
+        <template v-if="store.projects.length || !store.loading">
+          {{ store.projects.length }} project{{ store.projects.length === 1 ? "" : "s" }}
+          <template v-if="inUseCount">· {{ inUseCount }} in use</template>
+        </template>
+      </template>
+      <RouterLink to="/add" class="btn btn-primary btn-sm">
+        <Icon name="plus" /> Add project
+      </RouterLink>
+    </PageHeader>
 
     <!-- Filter bar -->
-    <div class="flex flex-wrap items-center gap-2">
-      <input
-        v-model="filters.q"
-        class="input input-bordered input-sm w-48"
-        placeholder="Search…"
-        @input="debouncedReload"
-      />
-      <select v-model="filters.source" class="select select-bordered select-sm" @change="reload">
+    <div class="mb-5 flex flex-wrap items-center gap-2">
+      <div class="relative w-full sm:w-64">
+        <Icon name="search" class="pointer-events-none absolute top-1/2 left-3 -translate-y-1/2 text-muted" />
+        <input
+          v-model="filters.q"
+          class="field pl-9"
+          placeholder="Search projects…"
+          @input="debouncedReload"
+        />
+      </div>
+      <select v-model="filters.source" class="field w-auto" @change="reload">
         <option value="">All sources</option>
         <option v-for="t in SOURCE_TYPES" :key="t" :value="t">{{ sourceInfo(t).label }}</option>
       </select>
-      <select v-model="filters.tag" class="select select-bordered select-sm" @change="reload">
+      <select v-model="filters.tag" class="field w-auto" @change="reload">
         <option value="">All tags</option>
-        <option v-for="t in tagsStore.tags" :key="t.id" :value="t.name">{{ t.name }}</option>
+        <option v-for="t in tagsStore.tags" :key="t.id" :value="t.name">#{{ t.name }}</option>
       </select>
-      <label class="label cursor-pointer gap-1">
-        <span class="label-text text-xs">In use</span>
-        <input type="checkbox" class="checkbox checkbox-sm" v-model="onlyInUse" @change="reload" />
-      </label>
+
+      <div class="flex h-9 items-center rounded-lg border border-line bg-surface p-0.5 text-xs">
+        <button
+          v-for="opt in USE_OPTIONS"
+          :key="opt.label"
+          type="button"
+          class="h-full cursor-pointer rounded-md px-2.5 transition-colors"
+          :class="useFilter === opt.value ? 'bg-surface-2 font-medium text-ink' : 'text-muted hover:text-ink'"
+          @click="setUseFilter(opt.value)"
+        >
+          {{ opt.label }}
+        </button>
+      </div>
     </div>
 
-    <div v-if="store.loading" class="flex justify-center py-16">
-      <span class="loading loading-spinner loading-lg" />
+    <div v-if="store.loading && store.projects.length === 0" class="panel divide-y divide-line">
+      <div v-for="n in 6" :key="n" class="flex items-center gap-3 px-4 py-3">
+        <div class="skeleton size-10" />
+        <div class="flex flex-1 flex-col gap-2">
+          <div class="skeleton h-3.5 w-40" />
+          <div class="skeleton h-3 w-24" />
+        </div>
+      </div>
     </div>
 
-    <div v-else-if="store.error" class="alert alert-error">{{ store.error }}</div>
+    <div v-else-if="store.error" class="notice notice-error">
+      <Icon name="alert" class="mt-0.5" /> {{ store.error }}
+    </div>
+
+    <EmptyState
+      v-else-if="store.projects.length === 0 && !hasFilters"
+      title="No projects yet"
+      hint="Add a project you like — a GitHub repo, a package, or any website. Or import your GitHub stars."
+      icon="folder"
+    >
+      <RouterLink to="/add" class="btn btn-primary btn-sm"><Icon name="plus" /> Add your first project</RouterLink>
+    </EmptyState>
 
     <EmptyState
       v-else-if="store.projects.length === 0"
-      title="No projects yet"
-      hint="Add a project you like — a GitHub repo, a package, or any website."
-      icon="🗂️"
+      title="No matches"
+      hint="Nothing matches these filters."
+      icon="search"
     >
-      <RouterLink to="/add" class="btn btn-primary btn-sm">+ Add your first project</RouterLink>
+      <button class="btn btn-outline btn-sm" @click="clearFilters">Clear filters</button>
     </EmptyState>
 
-    <div v-else class="grid grid-cols-1 gap-4 sm:grid-cols-2 lg:grid-cols-3">
+    <div v-else class="panel divide-y divide-line overflow-hidden" :class="store.loading && 'opacity-60'">
       <ProjectCard
         v-for="p in store.projects"
         :key="p.id"
@@ -54,10 +90,12 @@
 </template>
 
 <script setup lang="ts">
-import { onMounted, reactive, ref } from "vue";
-import { RouterLink } from "vue-router";
-import ProjectCard from "@/components/ProjectCard.vue";
+import { computed, onMounted, reactive, ref } from "vue";
+import { RouterLink, useRoute } from "vue-router";
 import EmptyState from "@/components/EmptyState.vue";
+import Icon from "@/components/Icon.vue";
+import PageHeader from "@/components/PageHeader.vue";
+import ProjectCard from "@/components/ProjectCard.vue";
 import { useProjectsStore } from "@/stores/projects";
 import { useTagsStore } from "@/stores/tags";
 import { SOURCE_TYPES, sourceInfo } from "@/lib/sources";
@@ -65,14 +103,40 @@ import type { ProjectFilter } from "@/lib/types";
 
 const store = useProjectsStore();
 const tagsStore = useTagsStore();
+const route = useRoute();
 
-const filters = reactive<ProjectFilter>({ q: "", source: "", tag: "" });
-const onlyInUse = ref(false);
+const USE_OPTIONS: { label: string; value: boolean | undefined }[] = [
+  { label: "All", value: undefined },
+  { label: "In use", value: true },
+  { label: "Not in use", value: false },
+];
+
+// The Tags page links here with ?tag=name.
+const filters = reactive<ProjectFilter>({
+  q: "",
+  source: "",
+  tag: typeof route.query.tag === "string" ? route.query.tag : "",
+});
+const useFilter = ref<boolean | undefined>(undefined);
+
+const inUseCount = computed(() => store.projects.filter((p) => p.in_use).length);
+const hasFilters = computed(
+  () => !!(filters.q || filters.source || filters.tag) || useFilter.value !== undefined,
+);
 
 function reload() {
-  const f: ProjectFilter = { ...filters };
-  if (onlyInUse.value) f.in_use = true;
-  store.load(f);
+  store.load({ ...filters, in_use: useFilter.value });
+}
+
+function setUseFilter(v: boolean | undefined) {
+  useFilter.value = v;
+  reload();
+}
+
+function clearFilters() {
+  Object.assign(filters, { q: "", source: "", tag: "" });
+  useFilter.value = undefined;
+  reload();
 }
 
 let timer: ReturnType<typeof setTimeout> | undefined;

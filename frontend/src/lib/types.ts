@@ -44,6 +44,7 @@ export interface FeedItem {
   project_id: number;
   project_name: string;
   source_type: SourceType;
+  source_identifier: string;
   release: Release;
 }
 

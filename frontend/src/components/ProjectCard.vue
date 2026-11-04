@@ -1,42 +1,48 @@
 <template>
-  <div class="card bg-base-100 shadow-md transition-shadow hover:shadow-xl">
-    <div class="card-body gap-3 p-4">
-      <div class="flex items-start justify-between gap-2">
-        <RouterLink
-          :to="`/projects/${project.id}`"
-          class="link-hover text-lg font-bold leading-tight"
+  <div class="group flex items-center gap-3 px-4 py-3 transition-colors hover:bg-surface-2/50">
+    <ProjectAvatar :name="project.name" :type="project.source_type" :identifier="project.source_identifier" />
+
+    <RouterLink :to="`/projects/${project.id}`" class="flex min-w-0 flex-1 flex-col gap-1">
+      <div class="flex min-w-0 items-baseline gap-2">
+        <span class="truncate font-medium group-hover:text-accent-text">{{ project.name }}</span>
+        <span
+          v-if="project.source_identifier && project.source_identifier !== project.name"
+          class="hidden truncate font-mono text-xs text-muted md:inline"
         >
-          {{ project.name }}
-        </RouterLink>
+          {{ project.source_identifier }}
+        </span>
       </div>
-
-      <div class="flex flex-wrap items-center gap-1">
+      <div class="flex flex-wrap items-center gap-x-3 gap-y-1">
         <SourceBadge :type="project.source_type" />
-        <TagChip v-for="t in project.tags" :key="t.id" :tag="t" />
+        <span v-for="t in project.tags" :key="t.id" class="text-xs text-muted">#{{ t.name }}</span>
       </div>
+    </RouterLink>
 
-      <div class="card-actions mt-1 items-center justify-between">
-        <label class="label cursor-pointer gap-2 py-0">
-          <span class="label-text text-xs">In use</span>
-          <input
-            type="checkbox"
-            class="toggle toggle-xs toggle-primary"
-            :checked="project.in_use"
-            @change="$emit('toggle-inuse', project)"
-          />
-        </label>
-        <a :href="project.url" target="_blank" rel="noopener" class="link link-primary text-xs">
-          Open ↗
-        </a>
-      </div>
-    </div>
+    <Toggle
+      :model-value="project.in_use"
+      label="In use"
+      :show-label="false"
+      title="In use"
+      @update:model-value="$emit('toggle-inuse', project)"
+    />
+    <a
+      :href="project.url"
+      target="_blank"
+      rel="noopener"
+      class="btn btn-ghost btn-sm btn-icon"
+      :aria-label="`Open ${project.name}`"
+    >
+      <Icon name="external" />
+    </a>
   </div>
 </template>
 
 <script setup lang="ts">
 import { RouterLink } from "vue-router";
+import Icon from "./Icon.vue";
+import ProjectAvatar from "./ProjectAvatar.vue";
 import SourceBadge from "./SourceBadge.vue";
-import TagChip from "./TagChip.vue";
+import Toggle from "./Toggle.vue";
 import type { Project } from "@/lib/types";
 
 defineProps<{ project: Project }>();

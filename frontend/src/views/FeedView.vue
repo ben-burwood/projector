@@ -1,52 +1,82 @@
 <template>
-  <div class="flex flex-col gap-4">
-    <div class="flex flex-wrap items-center justify-between gap-2">
-      <h1 class="text-2xl font-bold">Feed</h1>
-      <button class="btn btn-sm" :disabled="loading" @click="refresh">
-        <span v-if="loading" class="loading loading-spinner loading-xs" />
+  <div>
+    <PageHeader title="Feed" subtitle="Latest releases across everything you follow, fetched live.">
+      <button class="btn btn-outline btn-sm" :disabled="loading" @click="refresh">
+        <Icon name="refresh" :class="loading && 'animate-spin'" />
         Refresh
       </button>
-    </div>
+    </PageHeader>
 
-    <div class="flex flex-wrap items-center gap-2">
-      <select v-model="source" class="select select-bordered select-sm" @change="reload">
+    <div class="mb-5 flex flex-wrap items-center gap-2">
+      <select v-model="source" class="field w-auto" @change="reload">
         <option value="">All sources</option>
-        <option v-for="t in SOURCE_TYPES" :key="t" :value="t">{{ sourceInfo(t).label }}</option>
+        <option v-for="t in SOURCE_TYPES.filter((t) => sourceInfo(t).pollable)" :key="t" :value="t">
+          {{ sourceInfo(t).label }}
+        </option>
       </select>
-      <select v-model="tag" class="select select-bordered select-sm" @change="reload">
+      <select v-model="tag" class="field w-auto" @change="reload">
         <option value="">All tags</option>
-        <option v-for="t in tagsStore.tags" :key="t.id" :value="t.name">{{ t.name }}</option>
+        <option v-for="t in tagsStore.tags" :key="t.id" :value="t.name">#{{ t.name }}</option>
       </select>
-      <label class="label cursor-pointer gap-1">
-        <span class="label-text text-xs">Include not in use</span>
-        <input type="checkbox" class="checkbox checkbox-sm" v-model="includeNotInUse" @change="reload" />
-      </label>
+      <Toggle v-model="includeNotInUse" label="Include not in use" class="ml-1" @update:model-value="reload" />
     </div>
 
-    <!-- Per-project fetch errors, inline, non-fatal -->
-    <div v-if="errors.length" class="alert alert-warning flex-col items-start text-sm">
-      <span class="font-semibold">Some projects couldn't be fetched:</span>
-      <ul class="list-disc pl-5">
-        <li v-for="e in errors" :key="e.project_id">{{ e.project_name }}: {{ e.error }}</li>
+    <!-- Per-project fetch errors, collapsed and non-fatal -->
+    <details v-if="errors.length" class="notice notice-warn mb-5 block">
+      <summary class="flex cursor-pointer list-none items-center gap-2">
+        <Icon name="alert" />
+        {{ errors.length }} project{{ errors.length === 1 ? "" : "s" }} couldn't be fetched
+        <Icon name="chevron" class="ml-auto" />
+      </summary>
+      <ul class="mt-2 flex flex-col gap-1 pl-6 text-xs">
+        <li v-for="e in errors" :key="e.project_id">
+          <RouterLink :to="`/projects/${e.project_id}`" class="font-medium hover:underline">
+            {{ e.project_name }}
+          </RouterLink>
+          — {{ e.error }}
+        </li>
       </ul>
-    </div>
+    </details>
 
     <div v-if="loading && items.length === 0" class="flex flex-col gap-3">
-      <div v-for="n in 4" :key="n" class="skeleton h-28 w-full" />
+      <div v-for="n in 5" :key="n" class="skeleton h-20" />
     </div>
 
-    <div v-else-if="fatalError" class="alert alert-error">{{ fatalError }}</div>
+    <div v-else-if="fatalError" class="notice notice-error">
+      <Icon name="alert" class="mt-0.5" /> {{ fatalError }}
+    </div>
 
     <EmptyState
       v-else-if="items.length === 0"
       title="Nothing in the feed yet"
-      hint="Add some projects with releases (GitHub, PyPI, crates.io…) and they'll show up here."
-      icon="📰"
-    />
+      :hint="
+        includeNotInUse
+          ? 'Add projects with releases (GitHub, PyPI, crates.io…) and they\'ll show up here.'
+          : 'Only projects marked in use appear here. Mark some as in use, or include the rest.'
+      "
+      icon="feed"
+    >
+      <button v-if="!includeNotInUse" class="btn btn-outline btn-sm" @click="setIncludeAll">
+        Include not in use
+      </button>
+    </EmptyState>
 
-    <div v-else class="flex flex-col gap-3">
-      <ReleaseCard v-for="(item, i) in items" :key="`${item.project_id}-${item.release.external_id}-${i}`" :item="item" />
-      <button v-if="hasMore" class="btn btn-ghost btn-sm" :disabled="loading" @click="loadMore">
+    <div v-else class="flex flex-col gap-6">
+      <section v-for="group in groups" :key="group.label">
+        <h2 class="eyebrow sticky top-14 z-10 -mx-1 mb-2 bg-bg/80 px-1 py-2 backdrop-blur-lg">
+          {{ group.label }}
+        </h2>
+        <div class="panel divide-y divide-line overflow-hidden">
+          <ReleaseCard
+            v-for="(item, i) in group.items"
+            :key="`${item.project_id}-${item.release.external_id}-${i}`"
+            :item="item"
+          />
+        </div>
+      </section>
+
+      <button v-if="hasMore" class="btn btn-outline mx-auto" :disabled="loading" @click="loadMore">
+        <span v-if="loading" class="spinner" />
         Load more
       </button>
     </div>
@@ -54,10 +84,15 @@
 </template>
 
 <script setup lang="ts">
-import { onMounted, ref } from "vue";
-import ReleaseCard from "@/components/ReleaseCard.vue";
+import { computed, onMounted, ref } from "vue";
+import { RouterLink } from "vue-router";
 import EmptyState from "@/components/EmptyState.vue";
+import Icon from "@/components/Icon.vue";
+import PageHeader from "@/components/PageHeader.vue";
+import ReleaseCard from "@/components/ReleaseCard.vue";
+import Toggle from "@/components/Toggle.vue";
 import { api } from "@/lib/api";
+import { dayLabel } from "@/lib/format";
 import { SOURCE_TYPES, sourceInfo } from "@/lib/sources";
 import { useTagsStore } from "@/stores/tags";
 import type { FeedError, FeedItem } from "@/lib/types";
@@ -73,6 +108,18 @@ const page = ref(1);
 const source = ref("");
 const tag = ref("");
 const includeNotInUse = ref(false);
+
+// Items arrive sorted newest-first, so consecutive runs share a day label.
+const groups = computed(() => {
+  const out: { label: string; items: FeedItem[] }[] = [];
+  for (const item of items.value) {
+    const label = dayLabel(item.release.published_at);
+    const last = out[out.length - 1];
+    if (last && last.label === label) last.items.push(item);
+    else out.push({ label, items: [item] });
+  }
+  return out;
+});
 
 async function fetchPage(p: number, append: boolean) {
   loading.value = true;
@@ -102,6 +149,11 @@ function reload() {
 
 function loadMore() {
   fetchPage(page.value + 1, true);
+}
+
+function setIncludeAll() {
+  includeNotInUse.value = true;
+  reload();
 }
 
 async function refresh() {

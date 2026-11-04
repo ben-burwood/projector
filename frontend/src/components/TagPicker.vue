@@ -1,38 +1,35 @@
 <template>
-  <div class="flex flex-wrap items-center gap-2">
-    <label
+  <div class="flex flex-wrap items-center gap-1.5">
+    <button
       v-for="tag in tagsStore.tags"
       :key="tag.id"
-      class="cursor-pointer"
+      type="button"
+      class="chip cursor-pointer transition-colors"
+      :class="
+        modelValue.includes(tag.id)
+          ? 'border-accent bg-accent/15 text-accent-text'
+          : 'hover:border-muted/50 hover:text-ink'
+      "
+      :aria-pressed="modelValue.includes(tag.id)"
+      @click="toggle(tag.id)"
     >
-      <input
-        type="checkbox"
-        class="peer sr-only"
-        :checked="modelValue.includes(tag.id)"
-        @change="toggle(tag.id)"
-      />
-      <span
-        class="badge badge-outline peer-checked:badge-primary peer-checked:badge-outline-0"
-        :class="modelValue.includes(tag.id) ? 'badge-primary' : ''"
-      >
-        {{ tag.name }}
-      </span>
-    </label>
+      <Icon v-if="modelValue.includes(tag.id)" name="check" class="size-3" />
+      {{ tag.name }}
+    </button>
 
-    <div class="join">
+    <form class="flex items-center" @submit.prevent="addNew">
       <input
         v-model="newTag"
-        class="input input-xs input-bordered join-item w-28"
-        placeholder="new tag…"
-        @keydown.enter.prevent="addNew"
+        class="h-6 w-24 rounded-md border border-dashed border-line bg-transparent px-2 text-xs outline-none placeholder:text-muted/70 focus:border-accent focus:w-32 transition-[width]"
+        placeholder="+ new tag"
       />
-      <button type="button" class="btn btn-xs join-item" @click="addNew">+</button>
-    </div>
+    </form>
   </div>
 </template>
 
 <script setup lang="ts">
 import { onMounted, ref } from "vue";
+import Icon from "./Icon.vue";
 import { useTagsStore } from "@/stores/tags";
 
 const props = defineProps<{ modelValue: number[] }>();
